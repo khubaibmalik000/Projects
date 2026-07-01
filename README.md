@@ -13,5 +13,7 @@ A collection of DevOps / infrastructure automation projects — backup pipelines
 | [ansible-node-exporter-installer](ansible-node-exporter-installer/) | Ansible playbook that bulk-installs Node Exporter with Basic Auth across a fleet, using `raw` tasks (no Python required on targets). |
 | [node-exporter-bulk-installer](node-exporter-bulk-installer/) | Bash/SSH-loop alternative for installing and securing Node Exporter across servers without a config management tool. |
 | [cicd-gitlab-jenkins-sonarqube](cicd-gitlab-jenkins-sonarqube/) | Runbook for a CI/CD pipeline: GitLab triggers Jenkins via webhook, gated by SonarQube quality checks. |
+| [mysql-uptime-watchdog](mysql-uptime-watchdog/) | Bash daemon that pings MySQL/MariaDB and sends Telegram alerts on outage/recovery. |
+| [transcript-count-autoscaler](transcript-count-autoscaler/) | Custom Kubernetes autoscaler that scales a deployment based on a MySQL backlog count instead of CPU/memory. |
 
 Each project folder has its own README with setup and usage details.
