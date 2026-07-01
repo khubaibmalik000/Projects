@@ -15,5 +15,6 @@ A collection of DevOps / infrastructure automation projects — backup pipelines
 | [cicd-gitlab-jenkins-sonarqube](cicd-gitlab-jenkins-sonarqube/) | Runbook for a CI/CD pipeline: GitLab triggers Jenkins via webhook, gated by SonarQube quality checks. |
 | [mysql-uptime-watchdog](mysql-uptime-watchdog/) | Bash daemon that pings MySQL/MariaDB and sends Telegram alerts on outage/recovery. |
 | [transcript-count-autoscaler](transcript-count-autoscaler/) | Custom Kubernetes autoscaler that scales a deployment based on a MySQL backlog count instead of CPU/memory. |
+| [rustdesk-docker-server](rustdesk-docker-server/) | Self-hosted RustDesk remote-desktop server (ID/relay + web admin console) via Docker Compose. |
 
 Each project folder has its own README with setup and usage details.

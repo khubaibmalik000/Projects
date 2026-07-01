@@ -1,0 +1,44 @@
+services:
+  hbbs:
+    container_name: hbbs
+    image: rustdesk/rustdesk-server:latest
+    command: hbbs
+    volumes:
+      - ./data:/root
+    ports:
+      - "21115:21115"
+      - "21116:21116"
+      - "21116:21116/udp"
+      - "21118:21118"
+    depends_on:
+      - hbbr
+    restart: unless-stopped
+
+  hbbr:
+    container_name: hbbr
+    image: rustdesk/rustdesk-server:latest
+    command: hbbr
+    volumes:
+      - ./data:/root
+    ports:
+      - "21117:21117"
+      - "21119:21119"
+    restart: unless-stopped
+
+  rustdesk-api:
+    container_name: rustdesk-api
+    image: lejianwen/rustdesk-api:latest
+    environment:
+      - TZ=Asia/Karachi
+      - RUSTDESK_API_RUSTDESK_ID_SERVER=hbbs:21116
+      - RUSTDESK_API_RUSTDESK_RELAY_SERVER=hbbr:21117
+      - RUSTDESK_API_RUSTDESK_API_SERVER=http://YOUR_SERVER_IP:21114
+      - RUSTDESK_API_RUSTDESK_KEY=CHANGE_ME_SERVER_PUBLIC_KEY
+    ports:
+      - "21114:21114"
+    volumes:
+      - ./data-api:/app/data
+    depends_on:
+      - hbbs
+      - hbbr
+    restart: unless-stopped
