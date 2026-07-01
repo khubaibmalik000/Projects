@@ -1,0 +1,99 @@
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
+    parameters {
+        string(name: 'IMAGE_TAG', defaultValue: "${env.BUILD_NUMBER}", description: 'Docker image tag to build/deploy')
+        choice(name: 'DEPLOY_ENV', choices: ['dev', 'staging', 'prod'], description: 'Target environment')
+    }
+
+    environment {
+        REGISTRY        = 'your-registry.example.com'
+        IMAGE_NAME      = 'app'
+        HELM_RELEASE    = 'app'
+        HELM_CHART_PATH = 'helm/app'
+        REGISTRY_CREDS  = credentials('registry-credentials')   // Jenkins credential ID
+        KUBECONFIG_CRED = 'kubeconfig-cred'                      // Jenkins credential ID
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Lint & Unit Tests') {
+            steps {
+                sh '''
+                    npm ci
+                    npm run lint
+                    npm test -- --ci
+                '''
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t ${REGISTRY}/${IMAGE_NAME}:${params.IMAGE_TAG} ."
+            }
+        }
+
+        stage('Security Scan (Trivy)') {
+            steps {
+                sh "trivy image --exit-code 1 --severity HIGH,CRITICAL ${REGISTRY}/${IMAGE_NAME}:${params.IMAGE_TAG}"
+            }
+        }
+
+        stage('Push to Registry') {
+            steps {
+                sh '''
+                    echo "$REGISTRY_CREDS_PSW" | docker login "$REGISTRY" -u "$REGISTRY_CREDS_USR" --password-stdin
+                    docker push ${REGISTRY}/${IMAGE_NAME}:${params.IMAGE_TAG}
+                '''
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                withCredentials([file(credentialsId: "${KUBECONFIG_CRED}", variable: 'KUBECONFIG')]) {
+                    sh '''
+                        helm upgrade --install ${HELM_RELEASE} ${HELM_CHART_PATH} \
+                            --namespace ${DEPLOY_ENV} \
+                            --create-namespace \
+                            --set image.repository=${REGISTRY}/${IMAGE_NAME} \
+                            --set image.tag=${IMAGE_TAG} \
+                            --wait --timeout 5m
+                    '''
+                }
+            }
+        }
+
+        stage('Smoke Test') {
+            steps {
+                withCredentials([file(credentialsId: "${KUBECONFIG_CRED}", variable: 'KUBECONFIG')]) {
+                    sh '''
+                        kubectl rollout status deployment/${HELM_RELEASE} -n ${DEPLOY_ENV} --timeout=120s
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Deployed ${IMAGE_NAME}:${params.IMAGE_TAG} to ${params.DEPLOY_ENV}"
+        }
+        failure {
+            echo "Pipeline failed for ${IMAGE_NAME}:${params.IMAGE_TAG} on ${params.DEPLOY_ENV}"
+        }
+        always {
+            sh 'docker logout ${REGISTRY} || true'
+        }
+    }
+}

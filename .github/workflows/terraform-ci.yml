@@ -1,0 +1,74 @@
+name: Terraform CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform-aws-eks-platform/**'
+      - '.github/workflows/terraform-ci.yml'
+  pull_request:
+    paths:
+      - 'terraform-aws-eks-platform/**'
+      - '.github/workflows/terraform-ci.yml'
+
+defaults:
+  run:
+    working-directory: terraform-aws-eks-platform
+
+jobs:
+  fmt:
+    name: Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - run: terraform fmt -recursive -check
+
+  validate:
+    name: Validate (${{ matrix.dir }})
+    runs-on: ubuntu-latest
+    needs: fmt
+    strategy:
+      matrix:
+        dir: [bootstrap, environments/dev, environments/prod]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - name: terraform init (no backend)
+        working-directory: terraform-aws-eks-platform/${{ matrix.dir }}
+        run: terraform init -backend=false -input=false
+      - name: terraform validate
+        working-directory: terraform-aws-eks-platform/${{ matrix.dir }}
+        run: terraform validate
+
+  tflint:
+    name: TFLint
+    runs-on: ubuntu-latest
+    needs: fmt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+      - name: Run TFLint
+        run: |
+          tflint --init
+          tflint --recursive
+        continue-on-error: true
+
+  checkov:
+    name: Checkov Security Scan
+    runs-on: ubuntu-latest
+    needs: fmt
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: terraform-aws-eks-platform
+          framework: terraform
+          soft_fail: true
