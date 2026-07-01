@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dummy-apps
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dummy-apps
+  template:
+    metadata:
+      labels:
+        app: dummy-apps
+    spec:
+      containers:
+        - name: app1
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              start=$(date +%s)
+              i=1
+              while true; do
+                now=$(date +%s)
+                elapsed=$((now - start))
+                if [ $elapsed -ge 180 ]; then
+                  echo "[ERROR] Pod: $HOSTNAME Container: app1 Count: $i Time: $(date) - Simulated error after 3 min"
+                else
+                  echo "[INFO] Pod: $HOSTNAME Container: app1 Count: $i Time: $(date) - Processing request"
+                fi
+                i=$((i+1))
+                sleep 1
+              done
+
+        - name: app2
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              i=1
+              while true; do
+                echo "[INFO] Pod: $HOSTNAME Container: app2 Count: $i Time: $(date) - Processing request"
+                i=$((i+1))
+                sleep 1
+              done
+
+        - name: app3
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              i=1
+              while true; do
+                echo "[INFO] Pod: $HOSTNAME Container: app3 Count: $i Time: $(date) - Processing request"
+                i=$((i+1))
+                sleep 1
+              done
+
+        - name: app4
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              start=$(date +%s)
+              i=1
+              while true; do
+                now=$(date +%s)
+                elapsed=$((now - start))
+                if [ $elapsed -ge 180 ]; then
+                  echo "[ERROR] Pod: $HOSTNAME Container: app4 Count: $i Time: $(date) - Simulated error after 3 min"
+                else
+                  echo "[INFO] Pod: $HOSTNAME Container: app4 Count: $i Time: $(date) - Processing request"
+                fi
+                i=$((i+1))
+                sleep 1
+              done
+
+        - name: app5
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              i=1
+              while true; do
+                echo "[INFO] Pod: $HOSTNAME Container: app5 Count: $i Time: $(date) - Processing request"
+                i=$((i+1))
+                sleep 1
+              done

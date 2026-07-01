@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-exporter
+  namespace: node-exporter
+  labels:
+    app: node-exporter
+spec:
+  selector:
+    matchLabels:
+      app: node-exporter
+  template:
+    metadata:
+      labels:
+        app: node-exporter
+        # This will pick up the node's environment label
+        environment: production  # default, Prometheus can override
+    spec:
+      containers:
+      - name: node-exporter
+        image: quay.io/prometheus/node-exporter:latest
+        args:
+          - --web.config.file=/etc/node-exporter/web.yml
+        ports:
+        - containerPort: 9100
+          hostPort: 9100
+        resources:
+          limits:
+            memory: "100Mi"
+            cpu: "100m"
+        volumeMounts:
+        - name: web-config
+          mountPath: /etc/node-exporter
+          readOnly: true
+      hostNetwork: true
+      hostPID: true
+      dnsPolicy: ClusterFirstWithHostNet
+      volumes:
+      - name: web-config
+        secret:
+          secretName: node-exporter-basic-auth

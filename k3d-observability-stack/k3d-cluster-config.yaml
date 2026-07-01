@@ -1,0 +1,8 @@
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+servers: 2
+agents: 5
+ports:
+  - port: 30090:9090    # Prometheus → host:container
+  - port: 3000:3000     # Grafana
+  - port: 3100:3100     # Loki

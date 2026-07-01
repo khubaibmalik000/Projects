@@ -1,0 +1,117 @@
+
+*****************************************************INSATALLATION OF ANSIBLE**********************************************************************************
+
+sudo apt update
+sudo apt install ansible
+
+
+sudo mkdir -p /etc/ansible
+sudo chown -R $(whoami):$(whoami) /etc/ansible
+sudo chmod -R 755 /etc/ansible
+
+************************INVENTORY************************
+sudo nano /etc/ansible/hosts
+[workers]
+worker01.example.com ansible_host=10.0.0.11
+worker02.example.com ansible_host=10.0.0.12
+worker03.example.com ansible_host=10.0.0.13
+worker04.example.com ansible_host=10.0.0.14
+worker05.example.com ansible_host=10.0.0.15
+
+[all:vars]
+ansible_user=khubaib
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+
+#if you have the python3 installed on the target nodes then you have to ping the node to known hosts and for that we will use this given command which will ask your ssh password
+ansible all -m ping --ask-pass
+
+
+#if you dont have python 3 installed on the target nodes then you have to ping it raw with given command
+ansible all -i /etc/ansible/hosts -m raw -a "echo pong" --ask-pass -u khubaib -o -e 'ansible_ssh_common_args="-o StrictHostKeyChecking=no"'
+
+cd /etc/ansible
+mkdir -p playbooks
+cd playbooks
+
+********************************************************PLAY BOOK*************************************** 
+---
+- name: Install Prometheus Node Exporter with Basic Auth
+  hosts: all
+  gather_facts: no
+  vars:
+    node_exporter_version: "1.6.1"
+    basic_auth_plain_password: "CHANGE_ME_PASSWORD"
+  tasks:
+
+    - name: Download Node Exporter
+      raw: |
+        curl -LO https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz
+
+    - name: Extract Node Exporter
+      raw: |
+        tar xvf node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz
+
+    - name: Move Node Exporter binary
+      raw: |
+        sudo cp node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter /usr/local/bin/
+
+    - name: Create node_exporter Linux user
+      raw: |
+        sudo id -u node_exporter >/dev/null 2>&1 || sudo useradd -rs /bin/false node_exporter
+
+    - name: Install apache2-utils for htpasswd (if not present)
+      raw: |
+        sudo apt-get update && sudo apt-get install -y apache2-utils || true
+
+    - name: Generate hashed password for Basic Auth
+      raw: |
+        HASHED_PASS=$(htpasswd -nbBC 10 dummy {{ basic_auth_plain_password }} | cut -d: -f2)
+        echo $HASHED_PASS | sudo tee /tmp/node_exporter_hash.txt
+
+    - name: Create Node Exporter web config with proper YAML
+      raw: |
+        HASH=$(cat /tmp/node_exporter_hash.txt)
+        echo "basic_auth_users:" | sudo tee /etc/node_exporter_web.yml
+        echo "  {{ inventory_hostname }}: '$HASH'" | sudo tee -a /etc/node_exporter_web.yml
+
+    - name: Create systemd service file
+      raw: |
+        echo "[Unit]
+        Description=Prometheus Node Exporter
+        After=network.target
+
+        [Service]
+        User=node_exporter
+        ExecStart=/usr/local/bin/node_exporter --web.config.file=/etc/node_exporter_web.yml
+
+        [Install]
+        WantedBy=multi-user.target" | sudo tee /etc/systemd/system/node_exporter.service
+
+    - name: Reload systemd, enable and start Node Exporter
+      raw: |
+        sudo systemctl daemon-reload
+        sudo systemctl enable node_exporter
+        sudo systemctl restart node_exporter
+#as i dont have python3 installed on my nodes thats we will run the playbook with raw
+ansible-playbook -i /etc/ansible/hosts /etc/ansible/playbooks/install_node_exporter_basic_auth.yml \
+  -u khubaib -k -b -K
+  
+#then we will check if node exporter is running or not
+ ansible -i /etc/ansible/hosts workers -m raw -a "systemctl is-active node_exporter" -u khubaib -k -b -K
+
+#Then we will check if the authentication on node exporter is working or not with this given command
+ansible -i /etc/ansible/hosts workers -m raw -a \
+"curl -s -o /dev/null -w '%{http_code}' -u {{ inventory_hostname }}:your_password http://{{ ansible_host }}:9100/metrics" \
+-u khubaib -k -b -K --------------->if this command give code 200 it means authenticationis working
+
+**********************************************************************USE CASES**********************************************************************
+
+###to check the username of the nodes we can get the info with with command even we dont have sshpass or installed python3 on the nodes
+ANSIBLE_HOST_KEY_CHECKING=False \
+ansible all \
+-i "10.0.0.21,10.0.0.22,10.0.0.23,10.0.0.24,10.0.0.25," \
+-u khubaib \
+-m raw -a "hostname" \
+--ask-pass \
+-e "ansible_ssh_common_args='-o PreferredAuthentications=password -o PubkeyAuthentication=no'"
