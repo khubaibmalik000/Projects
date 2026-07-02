@@ -18,5 +18,6 @@ A collection of DevOps / infrastructure automation projects — backup pipelines
 | [rustdesk-docker-server](rustdesk-docker-server/) | Self-hosted RustDesk remote-desktop server (ID/relay + web admin console) via Docker Compose. |
 | [terraform-aws-eks-platform](terraform-aws-eks-platform/) | Modular Terraform IaC provisioning a production-grade AWS EKS platform (VPC/IAM/EKS modules, dev/prod environments, remote state), validated by CI on every push. |
 | [cicd-k8s-deployment-pipeline](cicd-k8s-deployment-pipeline/) | Jenkins + GitLab CI pipelines that build, scan, and deploy a containerized app to Kubernetes via Helm. |
+| [gcp-disaster-recovery-strategy-guide](gcp-disaster-recovery-strategy-guide/) | Reference docs on Cloud SQL HA vs. cross-region DR tradeoffs, and a hot-standby DR strategy for a Firebase application stack. |
 
 Each project folder has its own README with setup and usage details.
