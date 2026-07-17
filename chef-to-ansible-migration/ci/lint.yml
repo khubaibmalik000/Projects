@@ -1,0 +1,28 @@
+name: Lint
+
+on:
+  pull_request:
+    paths:
+      - 'roles/**'
+
+# Linting runs here, not inside `molecule test` — current Molecule
+# versions dropped native lint from the test sequence.
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install linters
+        run: pip install ansible-lint yamllint
+
+      - name: yamllint
+        run: yamllint roles/
+
+      - name: ansible-lint
+        run: ansible-lint roles/

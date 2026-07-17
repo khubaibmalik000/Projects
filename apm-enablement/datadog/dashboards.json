@@ -1,0 +1,43 @@
+{
+  "title": "fd-backend-admin — APM overview",
+  "description": "Latency, error rate, throughput, and service dependencies for the Admin service across all environments.",
+  "layout_type": "ordered",
+  "widgets": [
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "p95 / p99 latency",
+        "requests": [
+          { "q": "p95:trace.express.request.duration{service:fd-backend-admin} by {env}" },
+          { "q": "p99:trace.express.request.duration{service:fd-backend-admin} by {env}" }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "Error rate",
+        "requests": [
+          { "q": "sum:trace.express.request.errors{service:fd-backend-admin}.as_count() by {env}" }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "Throughput (req/min)",
+        "requests": [
+          { "q": "sum:trace.express.request.hits{service:fd-backend-admin}.as_count() by {env}" }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "servicemap",
+        "title": "Service dependency map",
+        "service": "fd-backend-admin",
+        "filters": { "env": ["prod"] }
+      }
+    }
+  ]
+}

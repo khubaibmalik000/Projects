@@ -1,0 +1,13 @@
+{# Mirrors: templates/default/nginx.conf.erb — same structure, Jinja2 syntax #}
+user  nginx;
+worker_processes  {{ nginx_worker_processes }};
+
+events {
+    worker_connections  {{ nginx_worker_connections }};
+}
+
+http {
+    server_tokens {{ nginx_server_tokens }};
+    keepalive_timeout  {{ nginx_keepalive_timeout }};
+    include /etc/nginx/conf.d/*.conf;
+}

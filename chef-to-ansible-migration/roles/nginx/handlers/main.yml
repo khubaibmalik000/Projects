@@ -1,0 +1,6 @@
+---
+# Mirrors: notifies :reload, 'service[nginx]' in recipes/default.rb
+- name: Reload nginx
+  ansible.builtin.service:
+    name: nginx
+    state: reloaded

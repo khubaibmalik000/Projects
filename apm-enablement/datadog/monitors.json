@@ -1,0 +1,36 @@
+[
+  {
+    "name": "[fd-backend-admin] p95 latency above threshold",
+    "type": "metric alert",
+    "query": "avg(last_10m):p95:trace.express.request.duration{service:fd-backend-admin,env:prod} > 1.5",
+    "message": "p95 latency for fd-backend-admin has exceeded 1.5s over the last 10 minutes. @slack-oncall",
+    "tags": ["service:fd-backend-admin", "team:platform"],
+    "options": {
+      "thresholds": { "critical": 1.5, "warning": 1.0 },
+      "notify_no_data": false,
+      "renotify_interval": 30
+    }
+  },
+  {
+    "name": "[fd-backend-admin] error rate spike",
+    "type": "metric alert",
+    "query": "sum(last_5m):sum:trace.express.request.errors{service:fd-backend-admin,env:prod}.as_count() / sum:trace.express.request.hits{service:fd-backend-admin,env:prod}.as_count() > 0.05",
+    "message": "Error rate for fd-backend-admin exceeded 5% over the last 5 minutes. @slack-oncall",
+    "tags": ["service:fd-backend-admin", "team:platform"],
+    "options": {
+      "thresholds": { "critical": 0.05 },
+      "notify_no_data": false
+    }
+  },
+  {
+    "name": "[fd-backend-admin] throughput anomaly",
+    "type": "anomaly alert",
+    "query": "avg(last_4h):anomalies(sum:trace.express.request.hits{service:fd-backend-admin,env:prod}.as_count(), 'basic', 2) >= 1",
+    "message": "Request throughput for fd-backend-admin is anomalous vs. its usual pattern. @slack-oncall",
+    "tags": ["service:fd-backend-admin", "team:platform"],
+    "options": {
+      "thresholds": { "critical": 1 },
+      "notify_no_data": false
+    }
+  }
+]

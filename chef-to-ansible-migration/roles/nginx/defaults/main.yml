@@ -1,0 +1,6 @@
+---
+# Mirrors: attributes/default.rb
+nginx_worker_processes: auto
+nginx_worker_connections: 1024
+nginx_keepalive_timeout: 65
+nginx_server_tokens: "off"

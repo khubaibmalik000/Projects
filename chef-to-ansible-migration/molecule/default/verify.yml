@@ -1,0 +1,14 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Confirm nginx is installed
+      ansible.builtin.command: nginx -v
+      changed_when: false
+
+    - name: Confirm nginx is active
+      ansible.builtin.systemd:
+        name: nginx
+      register: nginx_status
+      failed_when: nginx_status.status.ActiveState != "active"

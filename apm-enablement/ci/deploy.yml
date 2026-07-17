@@ -1,0 +1,29 @@
+name: Deploy Admin Service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/admin/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # DD_API_KEY never lives in app.yaml — it's appended at deploy time
+      # from a GitHub Actions secret backed by GCP Secret Manager, scoped
+      # per environment. Non-secret identifiers (DD_SERVICE, DD_ENV, DD_SITE)
+      # stay in the checked-in config/*.yaml files.
+      - name: Inject Datadog API key
+        run: echo "  DD_API_KEY: ${{ secrets.DATADOG_API_KEY }}" >> apps/admin/app.prod.yaml
+
+      - name: Deploy to App Engine Flex
+        run: gcloud app deploy apps/admin/app.prod.yaml --quiet
