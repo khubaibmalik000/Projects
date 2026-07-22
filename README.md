@@ -10,7 +10,7 @@ A collection of DevOps / infrastructure automation projects — backup pipelines
 | [chef-to-ansible-migration](chef-to-ansible-migration/) | In-progress full re-platform of a 186-cookbook HPC estate from Chef to Ansible — reuse-ordered migration tiers, Molecule testing on real EC2, and team conventions established from real conversions. |
 | [db-slow-query-monitor](db-slow-query-monitor/) | Bash script that reports slow, stuck, and lock-blocked queries on MySQL/MariaDB. |
 | [postgres-s3-backup-pipeline](postgres-s3-backup-pipeline/) | WAL archiving + scheduled full/incremental PostgreSQL backups shipped to S3. |
-| [postgres-master-slave-failover](postgres-master-slave-failover/) | Scripted two-node PostgreSQL failover runbook: promote a streaming standby, then safely rejoin the old primary via `pg_rewind` without split-brain. |
+| [postgres-master-slave-failover](postgres-master-slave-failover/) | PostgreSQL failover lab (Docker + two-node variants): promote a streaming standby, then safely rejoin the old primary via `pg_rewind` without split-brain. |
 | [mariadb-date-based-cleanup](mariadb-date-based-cleanup/) | Interactive script for safely purging old rows from MariaDB with a preview-then-confirm flow. |
 | [k3d-observability-stack](k3d-observability-stack/) | Prometheus + Grafana + Loki + Promtail + Node Exporter deployed on a local k3d cluster, with a synthetic log-generating workload and a custom dashboard. |
 | [ansible-node-exporter-installer](ansible-node-exporter-installer/) | Ansible playbook that bulk-installs Node Exporter with Basic Auth across a fleet, using `raw` tasks (no Python required on targets). |

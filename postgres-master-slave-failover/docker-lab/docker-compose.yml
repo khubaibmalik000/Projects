@@ -1,0 +1,47 @@
+services:
+  pg-master:
+    image: postgres:16
+    container_name: pg-master
+    hostname: pg-master
+    environment:
+      POSTGRES_PASSWORD: masterpass
+      POSTGRES_USER: postgres
+      POSTGRES_DB: testdb
+    volumes:
+      - ./master-init:/docker-entrypoint-initdb.d
+      - master-data:/var/lib/postgresql/data
+    command: >
+      postgres
+      -c wal_level=replica
+      -c max_wal_senders=10
+      -c max_replication_slots=10
+      -c hot_standby=on
+      -c wal_log_hints=on
+    ports:
+      - "5433:5432"
+    networks:
+      - pgnet
+
+  pg-slave:
+    build: ./slave
+    container_name: pg-slave
+    hostname: pg-slave
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      REPL_PASSWORD: replpass
+    volumes:
+      - slave-data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    depends_on:
+      - pg-master
+    networks:
+      - pgnet
+
+volumes:
+  master-data:
+  slave-data:
+
+networks:
+  pgnet:
+    driver: bridge
