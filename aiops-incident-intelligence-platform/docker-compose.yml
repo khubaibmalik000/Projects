@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: aiops
+      POSTGRES_USER: aiops
+      POSTGRES_PASSWORD: aiops
+    volumes:
+      - aiops-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiops -d aiops"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    environment:
+      AIOPS_DATABASE_URL: postgresql+psycopg2://aiops:aiops@postgres:5432/aiops
+      AIOPS_REMEDIATION_DRY_RUN: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  load-generator:
+    build: .
+    entrypoint: ["python", "scripts/replay_scenario_via_api.py"]
+    environment:
+      AIOPS_API_BASE_URL: http://api:8000
+    depends_on:
+      - api
+    profiles:
+      - demo
+
+volumes:
+  aiops-postgres-data:

@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aiops-api
+  labels:
+    app: aiops-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aiops-api
+  template:
+    metadata:
+      labels:
+        app: aiops-api
+    spec:
+      containers:
+        - name: aiops-api
+          image: ghcr.io/OWNER/aiops-incident-intelligence-platform:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: AIOPS_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: aiops-db-credentials
+                  key: database-url
+            - name: AIOPS_REMEDIATION_DRY_RUN
+              value: "true"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /v1/health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /v1/health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20

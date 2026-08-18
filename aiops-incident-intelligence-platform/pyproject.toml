@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aiops-incident-intelligence-platform"
+version = "1.0.0"
+description = "Streaming anomaly detection, log template mining, alert correlation, and remediation for infrastructure telemetry."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+    "pydantic>=2.6",
+    "numpy>=1.26",
+    "scikit-learn>=1.4",
+    "psycopg2-binary>=2.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.27",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+aiops-demo = "aiops.demo:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+ignore = [
+    "B008",   # FastAPI's Depends(...) as a default argument is the documented DI pattern, not a bug
+    "DTZ001", # test fixtures deliberately build naive datetimes for simple timedelta arithmetic
+    "DTZ901", # datetime.min is a never-observed dataclass-field sentinel, not a real timestamp
+]

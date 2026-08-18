@@ -6,6 +6,7 @@ A collection of DevOps / infrastructure automation projects — backup pipelines
 
 | Project | Description |
 |---|---|
+| [aiops-incident-intelligence-platform](aiops-incident-intelligence-platform/) | AIOps engine: EWMA/z-score + Isolation Forest anomaly detection, Drain-inspired log template mining, dependency-graph alert correlation with root-cause ranking, and a dry-run-by-default remediation rule engine. FastAPI service, SQLAlchemy/Postgres, Docker Compose, Kubernetes manifests, full pytest suite. |
 | [apm-enablement](apm-enablement/) | End-to-end APM (Datadog `dd-trace`, agentless) for 4 production services on GCP App Engine Flex — distributed tracing, latency/error dashboards, and a service map, with no sidecar support available. |
 | [chef-to-ansible-migration](chef-to-ansible-migration/) | In-progress full re-platform of a 186-cookbook HPC estate from Chef to Ansible — reuse-ordered migration tiers, Molecule testing on real EC2, and team conventions established from real conversions. |
 | [db-slow-query-monitor](db-slow-query-monitor/) | Bash script that reports slow, stuck, and lock-blocked queries on MySQL/MariaDB. |
