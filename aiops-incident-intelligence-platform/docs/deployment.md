@@ -1,5 +1,9 @@
 # Deployment
 
+Deploying the platform itself (below) gets you an empty API waiting for
+data. To actually feed it real telemetry, run the [node agent](../agent/README.md)
+on each server you want monitored.
+
 ## Local development
 
 ```bash

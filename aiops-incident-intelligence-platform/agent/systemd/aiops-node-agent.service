@@ -1,0 +1,26 @@
+# Install:
+#   sudo cp aiops-node-agent.service /etc/systemd/system/
+#   sudo cp aiops-node-agent.env /etc/default/aiops-node-agent   # then edit it
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now aiops-node-agent
+[Unit]
+Description=AIOps node agent (metrics + log forwarder)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/default/aiops-node-agent
+ExecStart=/opt/aiops-node-agent/.venv/bin/aiops-node-agent
+Restart=on-failure
+RestartSec=5
+User=nobody
+Group=nogroup
+NoNewPrivileges=true
+ProtectSystem=strict
+# ProtectSystem=strict makes almost the whole filesystem read-only to this
+# service. If AIOPS_AGENT_LOG_FILE points somewhere under /var or /opt,
+# add e.g.: ReadOnlyPaths=/var/log/myapp
+
+[Install]
+WantedBy=multi-user.target

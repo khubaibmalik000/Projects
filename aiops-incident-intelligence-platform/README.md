@@ -42,7 +42,7 @@ every signal.
 python -m venv .venv && source .venv/bin/activate   # .venv\Scripts\activate on Windows
 pip install -e ".[dev]"
 
-pytest                                 # 60+ tests across every module
+pytest                                 # 42 tests across every module
 python -m aiops.demo                   # run both synthetic scenarios end-to-end, no server needed
 uvicorn aiops.api.main:app --reload    # start the API on http://localhost:8000
 ```
@@ -71,6 +71,24 @@ server needed:
   z-score ever fires — but the joint pattern is what the Isolation Forest
   catches. Demonstrates why the platform has two detector types, not one.
 
+## Connecting real nodes
+
+The API only accepts data that's pushed to it — it doesn't scrape or
+auto-discover anything. [`agent/`](agent/) is a lightweight collector
+(`psutil` + stdlib only, no FastAPI/SQLAlchemy/scikit-learn) you run on
+each real server: it POSTs real CPU/memory/disk metrics on an interval
+and optionally tails a log file, forwarding both to a running API
+instance.
+
+```bash
+cd agent && pip install -e .
+AIOPS_API_BASE_URL=http://your-api:8000 AIOPS_AGENT_ENTITY=my-server-1 aiops-node-agent
+```
+
+See [agent/README.md](agent/README.md) for the full config reference,
+wiring up service topology across multiple agents, and a systemd unit
+for running it as a real service.
+
 ## Repository layout
 
 ```
@@ -89,6 +107,7 @@ tests/            unit + integration tests (pytest)
 docs/             architecture, algorithms, API reference, deployment, runbook
 deploy/k8s/       Deployment, Service, HPA, secret template
 scripts/          demo.py entrypoint, HTTP-based scenario replay for a running deployment
+agent/            standalone node agent that feeds real metrics/logs into the API (see above)
 ```
 
 ## Documentation
@@ -98,6 +117,7 @@ scripts/          demo.py entrypoint, HTTP-based scenario replay for a running d
 - [docs/api.md](docs/api.md) — full HTTP API reference
 - [docs/deployment.md](docs/deployment.md) — local dev, Docker Compose, Kubernetes, full config reference
 - [docs/runbook.md](docs/runbook.md) — how to add a remediation rule, action, or signal source
+- [agent/README.md](agent/README.md) — the node agent that connects real servers to the API
 
 The [GitHub Wiki](../../wiki) mirrors this documentation for browsing
 without cloning.
