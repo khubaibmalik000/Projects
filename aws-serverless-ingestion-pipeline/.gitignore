@@ -1,0 +1,22 @@
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Lambda build artifacts (rebuilt from source via lambda/build.sh)
+lambda/build/
+lambda/function.zip
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/

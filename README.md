@@ -22,6 +22,7 @@ A collection of DevOps / infrastructure automation projects — backup pipelines
 | [transcript-count-autoscaler](transcript-count-autoscaler/) | Custom Kubernetes autoscaler that scales a deployment based on a MySQL backlog count instead of CPU/memory. |
 | [rustdesk-docker-server](rustdesk-docker-server/) | Self-hosted RustDesk remote-desktop server (ID/relay + web admin console) via Docker Compose. |
 | [terraform-aws-eks-platform](terraform-aws-eks-platform/) | Modular Terraform IaC provisioning a production-grade AWS EKS platform (VPC/IAM/EKS modules, dev/prod environments, remote state), validated by CI on every push. |
+| [aws-serverless-ingestion-pipeline](aws-serverless-ingestion-pipeline/) | Event-driven S3 → Lambda → DynamoDB ingestion pipeline (Terraform modules, dev/prod environments), with a dead-letter queue + CloudWatch/SNS alerting for failures and a quarantine path for invalid records. Lambda handler covered by a 7-test pytest/moto suite, including an explicit idempotency check; validated by CI on every push. |
 | [cicd-k8s-deployment-pipeline](cicd-k8s-deployment-pipeline/) | Jenkins + GitLab CI pipelines that build, scan, and deploy a containerized app to Kubernetes via Helm. |
 | [gcp-disaster-recovery-strategy-guide](gcp-disaster-recovery-strategy-guide/) | Reference docs on Cloud SQL HA vs. cross-region DR tradeoffs, and a hot-standby DR strategy for a Firebase application stack. |
 

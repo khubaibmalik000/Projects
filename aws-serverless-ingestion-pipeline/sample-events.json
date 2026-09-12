@@ -1,0 +1,5 @@
+[
+  { "id": "evt-1001", "event_type": "signup", "timestamp": "2026-09-13T09:00:00Z" },
+  { "id": "evt-1002", "event_type": "login", "timestamp": "2026-09-13T09:02:30Z" },
+  { "id": "evt-1003", "event_type": "purchase", "timestamp": "2026-09-13T09:05:11Z" }
+]

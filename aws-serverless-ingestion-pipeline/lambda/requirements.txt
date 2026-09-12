@@ -1,0 +1,2 @@
+# Runtime dependencies for the deployed function.
+# boto3 is provided by the Lambda Python runtime itself — nothing to bundle.

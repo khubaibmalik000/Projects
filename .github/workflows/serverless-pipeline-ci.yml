@@ -1,0 +1,92 @@
+name: Serverless Pipeline CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'aws-serverless-ingestion-pipeline/**'
+      - '.github/workflows/serverless-pipeline-ci.yml'
+  pull_request:
+    paths:
+      - 'aws-serverless-ingestion-pipeline/**'
+      - '.github/workflows/serverless-pipeline-ci.yml'
+
+defaults:
+  run:
+    working-directory: aws-serverless-ingestion-pipeline
+
+jobs:
+  fmt:
+    name: Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - run: terraform fmt -recursive -check
+
+  validate:
+    name: Validate (${{ matrix.dir }})
+    runs-on: ubuntu-latest
+    needs: fmt
+    strategy:
+      matrix:
+        dir: [environments/dev, environments/prod]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - name: Build Lambda package (validate needs a real file to hash)
+        run: |
+          cd lambda
+          chmod +x build.sh
+          ./build.sh
+      - name: terraform init (no backend)
+        working-directory: aws-serverless-ingestion-pipeline/${{ matrix.dir }}
+        run: terraform init -backend=false -input=false
+      - name: terraform validate
+        working-directory: aws-serverless-ingestion-pipeline/${{ matrix.dir }}
+        run: terraform validate
+
+  tflint:
+    name: TFLint
+    runs-on: ubuntu-latest
+    needs: fmt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+      - name: Run TFLint
+        run: |
+          tflint --init
+          tflint --recursive
+        continue-on-error: true
+
+  checkov:
+    name: Checkov Security Scan
+    runs-on: ubuntu-latest
+    needs: fmt
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: aws-serverless-ingestion-pipeline
+          framework: terraform
+          soft_fail: true
+
+  test-lambda:
+    name: Lambda Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: pip install -r lambda/requirements-dev.txt
+      - name: Run pytest
+        run: pytest lambda/tests/ -v
