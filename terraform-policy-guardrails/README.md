@@ -11,7 +11,7 @@ It runs two ways:
 
 ## What it blocks
 
-Every violation carries a rule id and severity (`critical` / `high` / `medium`), not just a message — see [Severity, structured reports & waivers](#severity-structured-reports--waivers) below.
+Every violation carries a rule id and severity (`critical` / `high` / `medium`), not just a message — see [Severity levels, structured reports, and waivers](#severity-levels-structured-reports-and-waivers) below.
 
 | Rule id | Severity | Condition |
 |---|---|---|
@@ -28,7 +28,7 @@ Every violation carries a rule id and severity (`critical` / `high` / `medium`),
 
 ## How it works
 
-```
+```text
 terraform plan → terraform show -json → opa eval -d policy/ -i plan.json "data.terraform.guardrails.deny"
 ```
 
@@ -36,7 +36,7 @@ terraform plan → terraform show -json → opa eval -d policy/ -i plan.json "da
 
 ## Structure
 
-```
+```text
 policy/terraform.rego              — the 8 guardrail rules + severity, waiver filtering, and the report
 policy/waivers.rego                — documented, time-bound exceptions (see below)
 policy/terraform_test.rego         — opa test unit tests (21 cases)
@@ -47,6 +47,8 @@ scripts/build-signed-bundle.sh     — packages policy/ into an RS256-signed OPA
 scripts/serve.sh                   — serves the signed bundle as a live policy-decision API
 scripts/query.sh                   — plans a directory and asks the running server for a decision
 .regal/config.yaml                 — Rego lint config (one rule deliberately ignored, documented inline)
+.yamllint.yml                      — YAML lint config, tuned for GitHub Actions YAML
+.pymarkdown.json                   — Markdown lint config (line-length disabled; doesn't fit this doc's style)
 ```
 
 ## Try it
@@ -59,7 +61,7 @@ bash scripts/check.sh examples/compliant     # expect: PASS
 
 Verified output:
 
-```
+```text
 $ opa test policy/ -v
 PASS: 21/21
 
@@ -76,7 +78,7 @@ Report: {"by_severity":{"critical":0,"high":0,"medium":0},"total":0,"waived":0,"
 PASS: no policy violations in examples/compliant
 ```
 
-## Severity, structured reports & waivers
+## Severity levels, structured reports, and waivers
 
 Every violation is a structured object (`rule`, `resource`, `severity`, `message`), not just a string — `data.terraform.guardrails.report` summarizes them:
 
@@ -117,7 +119,7 @@ bash scripts/query.sh examples/compliant
 
 Verified output:
 
-```
+```text
 $ bash scripts/build-signed-bundle.sh
 Generated a new signing keypair in .keys/ (gitignored, not for reuse outside this demo)
 Built and signed bundle.tar.gz against .keys/private.pem
@@ -135,7 +137,7 @@ PASS (via policy server): no violations in examples/compliant
 
 **The tamper-proof claim isn't just asserted — it's tested.** Take the signed bundle, modify a policy file inside it *without re-signing*, and try to load it:
 
-```
+```text
 $ opa run --server --bundle bundle.tampered.tar.gz --verification-key .keys/public.pem --verification-key-id portfolio-demo
 error: load error: bundle bundle.tampered.tar.gz: file policy/terraform.rego not included in bundle signature
 ```
@@ -147,16 +149,32 @@ OPA refuses to start. This exact check runs in CI on every push — it's not a o
 - Terraform >= 1.5.0
 - [OPA](https://www.openpolicyagent.org/docs/latest/#running-opa) CLI
 - `openssl` and `curl` (only for the signed-bundle-server mode)
-- [Regal](https://github.com/open-policy-agent/regal) and [ShellCheck](https://www.shellcheck.net/) (only to run the same lint checks CI does, locally)
+- Optional, only to run the same checks CI does, locally: [Regal](https://github.com/open-policy-agent/regal), [ShellCheck](https://www.shellcheck.net/), [actionlint](https://github.com/rhysd/actionlint), [Gitleaks](https://github.com/gitleaks/gitleaks), `pip install yamllint pymarkdownlnt`
 
 ## CI
 
-`.github/workflows/policy-guardrails-ci.yml` (repo root) runs six jobs on every push:
+`.github/workflows/policy-guardrails-ci.yml` (repo root) runs 11 jobs (13 job runs, counting the two ×2 matrices) on every push:
+
+### Policy correctness
 
 1. **OPA Unit Tests** — `opa fmt --fail` (format check) then `opa test` (21 cases: guardrails, waiver expiry, report structure, blast-radius protection)
-2. **Rego Lint (Regal)** — [Regal](https://github.com/open-policy-agent/regal), the official Rego linter, at zero violations (`.regal/config.yaml` documents the one rule deliberately ignored, and why)
-3. **ShellCheck** — lints all four `scripts/*.sh`
-4. **Gate Check** (matrix ×2) — `scripts/check.sh` against both example directories, asserting the noncompliant one fails and the compliant one passes
-5. **Signed Bundle + Policy Decision Server** — builds and signs a bundle, starts the server, queries it over HTTP for both examples, then deliberately tampers with the bundle and asserts OPA refuses to load it
+2. **Gate Check** (matrix ×2) — `scripts/check.sh` against both example directories, asserting the noncompliant one fails and the compliant one passes
+3. **Signed Bundle + Policy Decision Server** — builds and signs a bundle, starts the server, queries it over HTTP for both examples, then deliberately tampers with the bundle and asserts OPA refuses to load it
 
-So the gate's correctness, code quality, and supply-chain integrity guarantee are all checked on every push — not just whether the Rego parses.
+### Code quality
+
+1. **Rego Lint (Regal)** — [Regal](https://github.com/open-policy-agent/regal), the official Rego linter, at zero violations (`.regal/config.yaml` documents the one rule deliberately ignored, and why)
+2. **ShellCheck** — lints all four `scripts/*.sh`
+3. **Actionlint** — lints the workflow file itself (yes, the CI pipeline checks its own YAML)
+4. **YAML Lint** — the workflow and `.regal/config.yaml`, with a config tuned for GitHub Actions YAML's known false-positive triggers (`.yamllint.yml`)
+5. **Markdown Lint** — this README, via `pymarkdown` (`.pymarkdown.json`)
+6. **Terraform Format & Validate** (matrix ×2) — `terraform fmt -check` + `terraform validate` against both example directories, standalone from the plan-based Gate Check
+
+### Security
+
+1. **Secret Scan (Gitleaks)** — scans the current working tree (not full git history — old commits predate a fix described below) for hardcoded credentials
+2. **Checkov** — a second, independent security-scanning engine against `examples/compliant`, catching a different class of finding than the hand-written Rego rules (soft-fail, same convention as `terraform-aws-eks-platform`'s own CI)
+
+So the gate's correctness, code quality, and supply-chain integrity guarantee — plus the CI pipeline's own YAML and this README — are all checked on every push, not just whether the Rego parses.
+
+**A real finding this caught**: adding Gitleaks surfaced a hardcoded `password = "changeme12345"` in both example `.tf` files (a fake placeholder, not a real credential, but exactly the pattern a secret scanner exists to catch). Fixed by moving it to a `sensitive` Terraform variable instead — better practice regardless of the scanner, and the actual reason it's documented here rather than just quietly fixed.

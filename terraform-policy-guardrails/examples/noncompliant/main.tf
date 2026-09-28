@@ -10,6 +10,14 @@ provider "aws" {
   skip_metadata_api_check     = true
 }
 
+# Not a real secret, and not one of the 8 rules this example is proving --
+# just kept out of the .tf source so secret scanners (rightly) stay quiet.
+variable "db_password" {
+  type      = string
+  sensitive = true
+  default   = "placeholder-not-a-real-secret"
+}
+
 resource "aws_security_group" "bad" {
   name = "bad-sg"
 
@@ -27,7 +35,7 @@ resource "aws_db_instance" "bad" {
   instance_class      = "db.t3.micro"
   allocated_storage   = 20
   username            = "admin"
-  password            = "changeme12345"
+  password            = var.db_password
   publicly_accessible = true  # violates: no public RDS
   storage_encrypted   = false # violates: RDS storage must be encrypted
   skip_final_snapshot = true

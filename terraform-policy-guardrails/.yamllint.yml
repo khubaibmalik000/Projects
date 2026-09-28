@@ -1,0 +1,13 @@
+# GitHub Actions workflow YAML has known false-positive triggers under
+# yamllint's defaults: the `on:` key is a YAML 1.1 truthy value (the
+# canonical gotcha every yamllint+GHA setup hits), workflows don't use `---`
+# document markers by convention, and `run:` one-liners routinely exceed an
+# 80-column limit designed for prose YAML, not CI scripts.
+extends: default
+
+rules:
+  document-start: disable
+  truthy:
+    check-keys: false
+  line-length:
+    max: 150

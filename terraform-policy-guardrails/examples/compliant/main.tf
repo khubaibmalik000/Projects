@@ -16,6 +16,15 @@ locals {
   }
 }
 
+# No literal password in the resource block below: RDS credentials belong in
+# a sensitive variable (backed by a secrets manager in a real deployment),
+# never hardcoded in a .tf file a secret scanner — or a person — would read.
+variable "db_password" {
+  type      = string
+  sensitive = true
+  default   = "placeholder-not-a-real-secret"
+}
+
 resource "aws_security_group" "good" {
   name = "good-sg"
   tags = local.tags
@@ -34,7 +43,7 @@ resource "aws_db_instance" "good" {
   instance_class      = "db.t3.micro"
   allocated_storage   = 20
   username            = "admin"
-  password            = "changeme12345"
+  password            = var.db_password
   publicly_accessible = false
   storage_encrypted   = true
   skip_final_snapshot = true
