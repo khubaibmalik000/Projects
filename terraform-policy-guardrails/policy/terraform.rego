@@ -25,6 +25,24 @@ deny contains msg if {
 	msg := sprintf("%s: RDS instance is publicly accessible", [rc.address])
 }
 
+# RDS storage must be encrypted at rest.
+deny contains msg if {
+	some rc in resource_changes
+	rc.type == "aws_db_instance"
+	rc.change.after.storage_encrypted != true
+	msg := sprintf("%s: RDS instance storage is not encrypted", [rc.address])
+}
+
+# S3 bucket ACLs must not grant public read/write.
+public_acls := {"public-read", "public-read-write", "authenticated-read"}
+
+deny contains msg if {
+	some rc in resource_changes
+	rc.type == "aws_s3_bucket_acl"
+	rc.change.after.acl in public_acls
+	msg := sprintf("%s: S3 bucket ACL %q grants public access", [rc.address, rc.change.after.acl])
+}
+
 # EBS volumes must be encrypted at rest.
 deny contains msg if {
 	some rc in resource_changes

@@ -36,11 +36,55 @@ test_denies_public_rds if {
 	plan := {"resource_changes": [{
 		"address": "aws_db_instance.bad",
 		"type": "aws_db_instance",
-		"change": {"after": {"tags": good_tags, "publicly_accessible": true}},
+		"change": {"after": {"tags": good_tags, "publicly_accessible": true, "storage_encrypted": true}},
 	}]}
 
 	violations := deny with input as plan
 	count(violations) == 1
+}
+
+test_denies_unencrypted_rds_storage if {
+	plan := {"resource_changes": [{
+		"address": "aws_db_instance.bad",
+		"type": "aws_db_instance",
+		"change": {"after": {"tags": good_tags, "publicly_accessible": false, "storage_encrypted": false}},
+	}]}
+
+	violations := deny with input as plan
+	count(violations) == 1
+}
+
+test_allows_encrypted_private_rds if {
+	plan := {"resource_changes": [{
+		"address": "aws_db_instance.good",
+		"type": "aws_db_instance",
+		"change": {"after": {"tags": good_tags, "publicly_accessible": false, "storage_encrypted": true}},
+	}]}
+
+	violations := deny with input as plan
+	count(violations) == 0
+}
+
+test_denies_public_s3_acl if {
+	plan := {"resource_changes": [{
+		"address": "aws_s3_bucket_acl.bad",
+		"type": "aws_s3_bucket_acl",
+		"change": {"after": {"acl": "public-read"}},
+	}]}
+
+	violations := deny with input as plan
+	count(violations) == 1
+}
+
+test_allows_private_s3_acl if {
+	plan := {"resource_changes": [{
+		"address": "aws_s3_bucket_acl.good",
+		"type": "aws_s3_bucket_acl",
+		"change": {"after": {"acl": "private"}},
+	}]}
+
+	violations := deny with input as plan
+	count(violations) == 0
 }
 
 test_denies_unencrypted_ebs if {

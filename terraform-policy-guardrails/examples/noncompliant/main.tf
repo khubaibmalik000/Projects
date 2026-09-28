@@ -28,7 +28,8 @@ resource "aws_db_instance" "bad" {
   allocated_storage   = 20
   username            = "admin"
   password            = "changeme12345"
-  publicly_accessible = true # violates: no public RDS
+  publicly_accessible = true  # violates: no public RDS
+  storage_encrypted   = false # violates: RDS storage must be encrypted
   skip_final_snapshot = true
 }
 
@@ -48,6 +49,23 @@ resource "aws_iam_policy" "bad" {
       Resource = "*"
     }]
   })
+}
+
+resource "aws_s3_bucket" "bad" {
+  bucket = "bad-example-bucket"
+}
+
+resource "aws_s3_bucket_ownership_controls" "bad" {
+  bucket = aws_s3_bucket.bad.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+resource "aws_s3_bucket_acl" "bad" {
+  depends_on = [aws_s3_bucket_ownership_controls.bad]
+  bucket     = aws_s3_bucket.bad.id
+  acl        = "public-read" # violates: no public bucket ACLs
 }
 
 # None of the above carry the mandatory Environment/Owner tags either.

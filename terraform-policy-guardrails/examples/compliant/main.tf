@@ -29,15 +29,16 @@ resource "aws_security_group" "good" {
 }
 
 resource "aws_db_instance" "good" {
-  identifier           = "good-db"
-  engine               = "postgres"
-  instance_class       = "db.t3.micro"
-  allocated_storage    = 20
-  username             = "admin"
-  password             = "changeme12345"
-  publicly_accessible  = false
-  skip_final_snapshot  = true
-  tags                 = local.tags
+  identifier          = "good-db"
+  engine              = "postgres"
+  instance_class      = "db.t3.micro"
+  allocated_storage   = 20
+  username            = "admin"
+  password            = "changeme12345"
+  publicly_accessible = false
+  storage_encrypted   = true
+  skip_final_snapshot = true
+  tags                = local.tags
 }
 
 resource "aws_ebs_volume" "good" {
@@ -57,4 +58,22 @@ resource "aws_iam_policy" "good" {
       Resource = "arn:aws:s3:::example-bucket/*"
     }]
   })
+}
+
+resource "aws_s3_bucket" "good" {
+  bucket = "good-example-bucket"
+  tags   = local.tags
+}
+
+resource "aws_s3_bucket_ownership_controls" "good" {
+  bucket = aws_s3_bucket.good.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+resource "aws_s3_bucket_acl" "good" {
+  depends_on = [aws_s3_bucket_ownership_controls.good]
+  bucket     = aws_s3_bucket.good.id
+  acl        = "private"
 }
