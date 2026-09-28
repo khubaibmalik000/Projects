@@ -88,6 +88,27 @@ raw_violations contains v if {
 		sprintf("%s: IAM policy statement grants Action:\"*\" on Resource:\"*\"", [rc.address]))
 }
 
+# Blast-radius protection: block plans that would delete or replace a
+# stateful resource, instead of just checking its configured attributes
+# like every rule above. `change.actions` is how Terraform's plan JSON
+# represents this — ["delete"] for a straight destroy, ["delete","create"]
+# or ["create","delete"] for a replace — regardless of *why* it's
+# happening (a removed resource block, a changed immutable argument, a
+# renamed resource with no `moved` block, etc.). A real prior-state-driven
+# destroy plan isn't reproducible in this repo's stateless examples (there
+# is deliberately no committed .tfstate to diff against), so this rule is
+# proven via opa test against the documented plan-JSON schema directly —
+# see terraform_test.rego.
+critical_resource_types := {"aws_db_instance", "aws_ebs_volume", "aws_s3_bucket"}
+
+raw_violations contains v if {
+	some rc in resource_changes
+	rc.type in critical_resource_types
+	"delete" in rc.change.actions
+	v := violation("no-destroy-critical-resource", rc.address, "critical",
+		sprintf("%s: plan would delete or replace this %s (actions: %v) — needs explicit human review, not an automated apply", [rc.address, rc.type, rc.change.actions]))
+}
+
 action_is_wildcard(a) if a == "*"
 
 action_is_wildcard(a) if a[_] == "*"

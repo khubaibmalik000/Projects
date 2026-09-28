@@ -19,9 +19,12 @@ Every violation carries a rule id and severity (`critical` / `high` / `medium`),
 | `rds-publicly-accessible` | critical | `aws_db_instance` with `publicly_accessible = true` |
 | `s3-bucket-public-acl` | critical | `aws_s3_bucket_acl` set to `public-read`, `public-read-write`, or `authenticated-read` |
 | `iam-wildcard-policy` | critical | IAM policy statement granting `Action: "*"` on `Resource: "*"` (parsed out of the policy JSON document itself) |
+| `no-destroy-critical-resource` | critical | Plan would **delete or replace** an `aws_db_instance`, `aws_ebs_volume`, or `aws_s3_bucket` — checks `change.actions`, not `change.after` (see below) |
 | `rds-storage-not-encrypted` | high | `aws_db_instance` without `storage_encrypted = true` |
 | `ebs-not-encrypted` | high | `aws_ebs_volume` without `encrypted = true` |
 | `missing-mandatory-tags` | medium | Any taggable resource missing the mandatory `Environment` / `Owner` tags |
+
+`no-destroy-critical-resource` is a different kind of check from the other six: it doesn't look at how a resource is *configured*, it looks at what the plan is about to *do* to it (`change.actions` — `["delete"]` for a destroy, `["delete","create"]`/`["create","delete"]` for a replace). Blast-radius protection, not attribute validation — a resource can be perfectly configured and still be one Terraform apply away from data loss if a `.tf` file gets edited wrong. Reproducing a real destroy/replace plan needs pre-existing Terraform state, which the example directories deliberately don't have (they're stateless, fully-offline `terraform plan` proofs) — so this rule is verified via `opa test` directly against the documented plan-JSON schema instead; see `policy/terraform_test.rego`.
 
 ## How it works
 
@@ -34,9 +37,9 @@ terraform plan → terraform show -json → opa eval -d policy/ -i plan.json "da
 ## Structure
 
 ```
-policy/terraform.rego              — the 7 guardrail rules + severity, waiver filtering, and the report
+policy/terraform.rego              — the 8 guardrail rules + severity, waiver filtering, and the report
 policy/waivers.rego                — documented, time-bound exceptions (see below)
-policy/terraform_test.rego         — opa test unit tests (15 cases)
+policy/terraform_test.rego         — opa test unit tests (21 cases)
 examples/noncompliant/             — violates every rule, on purpose
 examples/compliant/                — the same resources, fixed
 scripts/check.sh                   — local mode: plan + evaluate a directory, printing the report
@@ -57,7 +60,7 @@ Verified output:
 
 ```
 $ opa test policy/ -v
-PASS: 15/15
+PASS: 21/21
 
 $ bash scripts/check.sh examples/noncompliant
 Report: {"by_severity":{"critical":4,"high":2,"medium":8},"total":14,"waived":0, ...}
@@ -148,7 +151,7 @@ OPA refuses to start. This exact check runs in CI on every push — it's not a o
 
 `.github/workflows/policy-guardrails-ci.yml` (repo root) runs three jobs on every push:
 
-1. `opa test` — the policy's own unit tests (15 cases: guardrails, waiver expiry, report structure)
+1. `opa test` — the policy's own unit tests (21 cases: guardrails, waiver expiry, report structure, blast-radius protection)
 2. `scripts/check.sh` against both example directories (matrix), asserting the noncompliant one fails and the compliant one passes
 3. **Signed Bundle + Policy Decision Server** — builds and signs a bundle, starts the server, queries it over HTTP for both examples, then deliberately tampers with the bundle and asserts OPA refuses to load it
 

@@ -203,3 +203,47 @@ test_report_reflects_severity_and_waived_counts if {
 	r.by_severity.high == 0
 	r.by_severity.medium == 0
 }
+
+# --- Blast-radius protection (change.actions, not change.after) ---
+
+critical_resource_plan(actions) := {"resource_changes": [{
+	"address": "aws_db_instance.prod",
+	"type": "aws_db_instance",
+	"change": {"actions": actions, "after": {"tags": good_tags, "publicly_accessible": false, "storage_encrypted": true}},
+}]}
+
+test_denies_straight_destroy_of_critical_resource if {
+	violations := deny with input as critical_resource_plan(["delete"])
+	count(violations) == 1
+}
+
+test_denies_replace_of_critical_resource if {
+	violations := deny with input as critical_resource_plan(["delete", "create"])
+	count(violations) == 1
+}
+
+test_allows_in_place_update_of_critical_resource if {
+	violations := deny with input as critical_resource_plan(["update"])
+	count(violations) == 0
+}
+
+test_allows_create_of_critical_resource if {
+	violations := deny with input as critical_resource_plan(["create"])
+	count(violations) == 0
+}
+
+test_allows_no_op_of_critical_resource if {
+	violations := deny with input as critical_resource_plan(["no-op"])
+	count(violations) == 0
+}
+
+test_does_not_flag_destroy_of_a_non_critical_resource_type if {
+	plan := {"resource_changes": [{
+		"address": "aws_security_group.temp",
+		"type": "aws_security_group",
+		"change": {"actions": ["delete"], "after": null},
+	}]}
+
+	violations := deny with input as plan
+	count(violations) == 0
+}
