@@ -16,6 +16,26 @@ resource_changes := input.resource_changes
 # wall-clock time for real `terraform plan` evaluation.
 now_ns := object.get(input, "now_ns", time.now_ns())
 
+public_acls := {"public-read", "public-read-write", "authenticated-read"}
+
+required_tags := {"Environment", "Owner"}
+
+taggable_types := {"aws_security_group", "aws_db_instance", "aws_ebs_volume", "aws_instance", "aws_s3_bucket"}
+
+# Blast-radius protection (see the no-destroy-critical-resource rule below):
+# block plans that would delete or replace a stateful resource, instead of
+# just checking its configured attributes like every rule above it.
+# `change.actions` is how Terraform's plan JSON represents this —
+# ["delete"] for a straight destroy, ["delete","create"] or
+# ["create","delete"] for a replace — regardless of *why* it's happening (a
+# removed resource block, a changed immutable argument, a renamed resource
+# with no `moved` block, etc.). A real prior-state-driven destroy plan
+# isn't reproducible in this repo's stateless examples (there is
+# deliberately no committed .tfstate to diff against), so that rule is
+# proven via opa test against the documented plan-JSON schema directly —
+# see terraform_test.rego.
+critical_resource_types := {"aws_db_instance", "aws_ebs_volume", "aws_s3_bucket"}
+
 raw_violations contains v if {
 	some rc in resource_changes
 	rc.type == "aws_security_group"
@@ -24,47 +44,51 @@ raw_violations contains v if {
 	rule.to_port >= 22
 	some cidr in rule.cidr_blocks
 	cidr == "0.0.0.0/0"
-	v := violation("ssh-open-to-world", rc.address, "critical",
-		sprintf("%s: security group ingress allows SSH (port 22) from 0.0.0.0/0", [rc.address]))
+	v := violation(
+		"ssh-open-to-world", rc.address, "critical",
+		sprintf("%s: security group ingress allows SSH (port 22) from 0.0.0.0/0", [rc.address]),
+	)
 }
 
 raw_violations contains v if {
 	some rc in resource_changes
 	rc.type == "aws_db_instance"
 	rc.change.after.publicly_accessible == true
-	v := violation("rds-publicly-accessible", rc.address, "critical",
-		sprintf("%s: RDS instance is publicly accessible", [rc.address]))
+	v := violation(
+		"rds-publicly-accessible", rc.address, "critical",
+		sprintf("%s: RDS instance is publicly accessible", [rc.address]),
+	)
 }
 
 raw_violations contains v if {
 	some rc in resource_changes
 	rc.type == "aws_db_instance"
 	rc.change.after.storage_encrypted != true
-	v := violation("rds-storage-not-encrypted", rc.address, "high",
-		sprintf("%s: RDS instance storage is not encrypted", [rc.address]))
+	v := violation(
+		"rds-storage-not-encrypted", rc.address, "high",
+		sprintf("%s: RDS instance storage is not encrypted", [rc.address]),
+	)
 }
-
-public_acls := {"public-read", "public-read-write", "authenticated-read"}
 
 raw_violations contains v if {
 	some rc in resource_changes
 	rc.type == "aws_s3_bucket_acl"
 	rc.change.after.acl in public_acls
-	v := violation("s3-bucket-public-acl", rc.address, "critical",
-		sprintf("%s: S3 bucket ACL %q grants public access", [rc.address, rc.change.after.acl]))
+	v := violation(
+		"s3-bucket-public-acl", rc.address, "critical",
+		sprintf("%s: S3 bucket ACL %q grants public access", [rc.address, rc.change.after.acl]),
+	)
 }
 
 raw_violations contains v if {
 	some rc in resource_changes
 	rc.type == "aws_ebs_volume"
 	rc.change.after.encrypted != true
-	v := violation("ebs-not-encrypted", rc.address, "high",
-		sprintf("%s: EBS volume is not encrypted", [rc.address]))
+	v := violation(
+		"ebs-not-encrypted", rc.address, "high",
+		sprintf("%s: EBS volume is not encrypted", [rc.address]),
+	)
 }
-
-required_tags := {"Environment", "Owner"}
-
-taggable_types := {"aws_security_group", "aws_db_instance", "aws_ebs_volume", "aws_instance", "aws_s3_bucket"}
 
 raw_violations contains v if {
 	some rc in resource_changes
@@ -72,8 +96,10 @@ raw_violations contains v if {
 	tags := object.get(rc.change.after, "tags", {})
 	some tag in required_tags
 	not tags[tag]
-	v := violation("missing-mandatory-tags", rc.address, "medium",
-		sprintf("%s: missing required tag %q", [rc.address, tag]))
+	v := violation(
+		"missing-mandatory-tags", rc.address, "medium",
+		sprintf("%s: missing required tag %q", [rc.address, tag]),
+	)
 }
 
 raw_violations contains v if {
@@ -84,38 +110,29 @@ raw_violations contains v if {
 	stmt.Effect == "Allow"
 	action_is_wildcard(stmt.Action)
 	resource_is_wildcard(stmt.Resource)
-	v := violation("iam-wildcard-policy", rc.address, "critical",
-		sprintf("%s: IAM policy statement grants Action:\"*\" on Resource:\"*\"", [rc.address]))
+	v := violation(
+		"iam-wildcard-policy", rc.address, "critical",
+		sprintf("%s: IAM policy statement grants Action:\"*\" on Resource:\"*\"", [rc.address]),
+	)
 }
-
-# Blast-radius protection: block plans that would delete or replace a
-# stateful resource, instead of just checking its configured attributes
-# like every rule above. `change.actions` is how Terraform's plan JSON
-# represents this — ["delete"] for a straight destroy, ["delete","create"]
-# or ["create","delete"] for a replace — regardless of *why* it's
-# happening (a removed resource block, a changed immutable argument, a
-# renamed resource with no `moved` block, etc.). A real prior-state-driven
-# destroy plan isn't reproducible in this repo's stateless examples (there
-# is deliberately no committed .tfstate to diff against), so this rule is
-# proven via opa test against the documented plan-JSON schema directly —
-# see terraform_test.rego.
-critical_resource_types := {"aws_db_instance", "aws_ebs_volume", "aws_s3_bucket"}
 
 raw_violations contains v if {
 	some rc in resource_changes
 	rc.type in critical_resource_types
 	"delete" in rc.change.actions
-	v := violation("no-destroy-critical-resource", rc.address, "critical",
-		sprintf("%s: plan would delete or replace this %s (actions: %v) — needs explicit human review, not an automated apply", [rc.address, rc.type, rc.change.actions]))
+	v := violation("no-destroy-critical-resource", rc.address, "critical", sprintf(
+		"%s: plan would delete or replace this %s (actions: %v) — needs explicit human review, not an automated apply",
+		[rc.address, rc.type, rc.change.actions],
+	))
 }
 
-action_is_wildcard(a) if a == "*"
+action_is_wildcard("*")
 
-action_is_wildcard(a) if a[_] == "*"
+action_is_wildcard(a) if "*" in a
 
-resource_is_wildcard(r) if r == "*"
+resource_is_wildcard("*")
 
-resource_is_wildcard(r) if r[_] == "*"
+resource_is_wildcard(r) if "*" in r
 
 violation(rule, resource, severity, message) := {
 	"rule": rule,
@@ -143,10 +160,24 @@ waived contains v if {
 	is_waived(v)
 }
 
+# METADATA
+# title: deny
+# description: >
+#   Flat set of violation messages, waivers already applied. The stable
+#   public entrypoint scripts/check.sh and scripts/query.sh query against
+#   the signed bundle — kept for backward compatibility as the policy
+#   gained severities and the structured `report` below it.
+# entrypoint: true
 deny contains v.message if some v in violations
 
 severities := {"critical", "high", "medium"}
 
+# METADATA
+# title: report
+# description: >
+#   Structured decision output: total/waived counts, a severity breakdown,
+#   and the full violation objects (rule id, resource, severity, message).
+# entrypoint: true
 report := {
 	"total": count(violations),
 	"waived": count(waived),

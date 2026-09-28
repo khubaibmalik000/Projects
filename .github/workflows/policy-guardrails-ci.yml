@@ -24,7 +24,27 @@ jobs:
       - uses: open-policy-agent/setup-opa@v2
         with:
           version: latest
+      - run: opa fmt --fail -l policy/
       - run: opa test policy/ -v
+
+  regal-lint:
+    name: Rego Lint (Regal)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Regal
+        run: |
+          curl -sL -o regal "https://github.com/open-policy-agent/regal/releases/download/v0.42.0/regal_Linux_x86_64"
+          chmod +x regal
+          sudo mv regal /usr/local/bin/regal
+      - run: regal lint policy/
+
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck scripts/*.sh
 
   check-examples:
     name: Gate Check (${{ matrix.dir }})

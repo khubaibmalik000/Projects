@@ -1,0 +1,10 @@
+rules:
+  idiomatic:
+    # Regal wants directories to mirror the package path (e.g.
+    # policy/terraform/guardrails/*.rego for `package terraform.guardrails`).
+    # Every script, the signed-bundle build, and this README document a flat
+    # `policy/` layout — restructuring it buys nothing here (one package,
+    # three files) and would just be churn against every `-d policy/` /
+    # `-b policy/` reference. Deliberately ignored, not missed.
+    directory-package-mismatch:
+      level: ignore

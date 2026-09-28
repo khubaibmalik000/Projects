@@ -46,6 +46,7 @@ scripts/check.sh                   — local mode: plan + evaluate a directory, 
 scripts/build-signed-bundle.sh     — packages policy/ into an RS256-signed OPA bundle
 scripts/serve.sh                   — serves the signed bundle as a live policy-decision API
 scripts/query.sh                   — plans a directory and asks the running server for a decision
+.regal/config.yaml                 — Rego lint config (one rule deliberately ignored, documented inline)
 ```
 
 ## Try it
@@ -146,13 +147,16 @@ OPA refuses to start. This exact check runs in CI on every push — it's not a o
 - Terraform >= 1.5.0
 - [OPA](https://www.openpolicyagent.org/docs/latest/#running-opa) CLI
 - `openssl` and `curl` (only for the signed-bundle-server mode)
+- [Regal](https://github.com/open-policy-agent/regal) and [ShellCheck](https://www.shellcheck.net/) (only to run the same lint checks CI does, locally)
 
 ## CI
 
-`.github/workflows/policy-guardrails-ci.yml` (repo root) runs three jobs on every push:
+`.github/workflows/policy-guardrails-ci.yml` (repo root) runs six jobs on every push:
 
-1. `opa test` — the policy's own unit tests (21 cases: guardrails, waiver expiry, report structure, blast-radius protection)
-2. `scripts/check.sh` against both example directories (matrix), asserting the noncompliant one fails and the compliant one passes
-3. **Signed Bundle + Policy Decision Server** — builds and signs a bundle, starts the server, queries it over HTTP for both examples, then deliberately tampers with the bundle and asserts OPA refuses to load it
+1. **OPA Unit Tests** — `opa fmt --fail` (format check) then `opa test` (21 cases: guardrails, waiver expiry, report structure, blast-radius protection)
+2. **Rego Lint (Regal)** — [Regal](https://github.com/open-policy-agent/regal), the official Rego linter, at zero violations (`.regal/config.yaml` documents the one rule deliberately ignored, and why)
+3. **ShellCheck** — lints all four `scripts/*.sh`
+4. **Gate Check** (matrix ×2) — `scripts/check.sh` against both example directories, asserting the noncompliant one fails and the compliant one passes
+5. **Signed Bundle + Policy Decision Server** — builds and signs a bundle, starts the server, queries it over HTTP for both examples, then deliberately tampers with the bundle and asserts OPA refuses to load it
 
-So the gate's correctness *and* its supply-chain integrity guarantee are both checked on every push, not just its syntax.
+So the gate's correctness, code quality, and supply-chain integrity guarantee are all checked on every push — not just whether the Rego parses.
