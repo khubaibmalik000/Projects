@@ -11,13 +11,17 @@ It runs two ways:
 
 ## What it blocks
 
-- Security group ingress open to `0.0.0.0/0` on port 22 (SSH to the world)
-- `aws_db_instance` with `publicly_accessible = true`
-- `aws_db_instance` without `storage_encrypted = true`
-- `aws_ebs_volume` without `encrypted = true`
-- `aws_s3_bucket_acl` set to `public-read`, `public-read-write`, or `authenticated-read`
-- Any taggable resource missing the mandatory `Environment` / `Owner` tags
-- An IAM policy statement granting `Action: "*"` on `Resource: "*"` (parsed out of the policy JSON document itself)
+Every violation carries a rule id and severity (`critical` / `high` / `medium`), not just a message — see [Severity, structured reports & waivers](#severity-structured-reports--waivers) below.
+
+| Rule id | Severity | Condition |
+|---|---|---|
+| `ssh-open-to-world` | critical | Security group ingress open to `0.0.0.0/0` on port 22 |
+| `rds-publicly-accessible` | critical | `aws_db_instance` with `publicly_accessible = true` |
+| `s3-bucket-public-acl` | critical | `aws_s3_bucket_acl` set to `public-read`, `public-read-write`, or `authenticated-read` |
+| `iam-wildcard-policy` | critical | IAM policy statement granting `Action: "*"` on `Resource: "*"` (parsed out of the policy JSON document itself) |
+| `rds-storage-not-encrypted` | high | `aws_db_instance` without `storage_encrypted = true` |
+| `ebs-not-encrypted` | high | `aws_ebs_volume` without `encrypted = true` |
+| `missing-mandatory-tags` | medium | Any taggable resource missing the mandatory `Environment` / `Owner` tags |
 
 ## How it works
 
@@ -30,11 +34,12 @@ terraform plan → terraform show -json → opa eval -d policy/ -i plan.json "da
 ## Structure
 
 ```
-policy/terraform.rego              — the 7 guardrail rules
-policy/terraform_test.rego         — opa test unit tests (11 cases: one deny + one allow per rule area)
+policy/terraform.rego              — the 7 guardrail rules + severity, waiver filtering, and the report
+policy/waivers.rego                — documented, time-bound exceptions (see below)
+policy/terraform_test.rego         — opa test unit tests (15 cases)
 examples/noncompliant/             — violates every rule, on purpose
 examples/compliant/                — the same resources, fixed
-scripts/check.sh                   — local mode: plan + evaluate a directory in one shot
+scripts/check.sh                   — local mode: plan + evaluate a directory, printing the report
 scripts/build-signed-bundle.sh     — packages policy/ into an RS256-signed OPA bundle
 scripts/serve.sh                   — serves the signed bundle as a live policy-decision API
 scripts/query.sh                   — plans a directory and asks the running server for a decision
@@ -52,9 +57,10 @@ Verified output:
 
 ```
 $ opa test policy/ -v
-PASS: 11/11
+PASS: 15/15
 
 $ bash scripts/check.sh examples/noncompliant
+Report: {"by_severity":{"critical":4,"high":2,"medium":8},"total":14,"waived":0, ...}
 FAIL: policy violations in examples/noncompliant
 ["aws_db_instance.bad: RDS instance is publicly accessible",
  "aws_db_instance.bad: RDS instance storage is not encrypted",
@@ -62,8 +68,37 @@ FAIL: policy violations in examples/noncompliant
  ... 14 total]
 
 $ bash scripts/check.sh examples/compliant
+Report: {"by_severity":{"critical":0,"high":0,"medium":0},"total":0,"waived":0,"violations":[]}
 PASS: no policy violations in examples/compliant
 ```
+
+## Severity, structured reports & waivers
+
+Every violation is a structured object (`rule`, `resource`, `severity`, `message`), not just a string — `data.terraform.guardrails.report` summarizes them:
+
+```json
+{
+  "total": 14,
+  "waived": 0,
+  "by_severity": { "critical": 4, "high": 2, "medium": 8 },
+  "violations": [ { "rule": "ssh-open-to-world", "resource": "aws_security_group.bad", "severity": "critical", "message": "..." }, ... ]
+}
+```
+
+`deny` (the flat message list `check.sh`/`query.sh` gate on) stays backward compatible — it's just `report.violations` mapped to their `message` field, with waived violations already excluded.
+
+**Waivers** (`policy/waivers.rego`) are documented, time-bound exceptions — never a blanket bypass. Each entry names the exact resource, the exact rule, an expiry timestamp, and a reason:
+
+```rego
+{
+	"resource": "aws_security_group.bastion",
+	"rule": "ssh-open-to-world",
+	"expires": "2026-12-31T00:00:00Z",
+	"reason": "Temporary bastion SSH access for the Q4 migration, approved by @platform-lead",
+}
+```
+
+A waiver only suppresses that one rule on that one resource, and only until it expires — proven with real time-comparison tests, not just described: `test_waiver_suppresses_matching_violation_before_expiry`, `test_waiver_stops_suppressing_after_expiry`, and `test_waiver_does_not_suppress_a_different_resource` in `policy/terraform_test.rego` pin `input.now_ns` to specific instants before/after the expiry and assert the violation reappears once the waiver lapses.
 
 ## Signed bundle + policy decision server
 
@@ -113,7 +148,7 @@ OPA refuses to start. This exact check runs in CI on every push — it's not a o
 
 `.github/workflows/policy-guardrails-ci.yml` (repo root) runs three jobs on every push:
 
-1. `opa test` — the policy's own unit tests
+1. `opa test` — the policy's own unit tests (15 cases: guardrails, waiver expiry, report structure)
 2. `scripts/check.sh` against both example directories (matrix), asserting the noncompliant one fails and the compliant one passes
 3. **Signed Bundle + Policy Decision Server** — builds and signs a bundle, starts the server, queries it over HTTP for both examples, then deliberately tampers with the bundle and asserts OPA refuses to load it
 

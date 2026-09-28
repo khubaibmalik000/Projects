@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Plans a Terraform directory and evaluates it against the OPA guardrails.
-# Exits non-zero and prints each violation if any `deny` rule fires.
+# Exits non-zero and prints each unwaived violation if any `deny` rule
+# fires, plus a severity/waiver breakdown from `report`.
 #
 # Usage: scripts/check.sh <path-to-terraform-dir>
 set -euo pipefail
@@ -15,8 +16,12 @@ terraform show -json plan.tfplan >plan.json
 rm -f plan.tfplan
 popd >/dev/null
 
-VIOLATIONS=$(opa eval --format raw -d "$POLICY_DIR/terraform.rego" -i "$DIR/plan.json" "data.terraform.guardrails.deny")
+# -d "$POLICY_DIR" (not just terraform.rego) so waivers.rego loads too.
+REPORT=$(opa eval --format raw -d "$POLICY_DIR" -i "$DIR/plan.json" "data.terraform.guardrails.report")
+VIOLATIONS=$(opa eval --format raw -d "$POLICY_DIR" -i "$DIR/plan.json" "data.terraform.guardrails.deny")
 rm -f "$DIR/plan.json"
+
+echo "Report: $REPORT"
 
 if [ "$(echo "$VIOLATIONS" | tr -d '[:space:]')" = "[]" ]; then
   echo "PASS: no policy violations in $DIR"
