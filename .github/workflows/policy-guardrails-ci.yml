@@ -48,7 +48,7 @@ jobs:
       - name: Run gate against ${{ matrix.dir }}, expecting it to ${{ matrix.expect }}
         run: |
           set +e
-          ./scripts/check.sh "${{ matrix.dir }}"
+          bash scripts/check.sh "${{ matrix.dir }}"
           status=$?
           set -e
           if [ "${{ matrix.expect }}" = "pass" ] && [ "$status" -ne 0 ]; then
