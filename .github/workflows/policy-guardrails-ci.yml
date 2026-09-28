@@ -1,0 +1,62 @@
+name: Policy Guardrails CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform-policy-guardrails/**'
+      - '.github/workflows/policy-guardrails-ci.yml'
+  pull_request:
+    paths:
+      - 'terraform-policy-guardrails/**'
+      - '.github/workflows/policy-guardrails-ci.yml'
+
+defaults:
+  run:
+    working-directory: terraform-policy-guardrails
+
+jobs:
+  opa-test:
+    name: OPA Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: open-policy-agent/setup-opa@v2
+        with:
+          version: latest
+      - run: opa test policy/ -v
+
+  check-examples:
+    name: Gate Check (${{ matrix.dir }})
+    runs-on: ubuntu-latest
+    needs: opa-test
+    strategy:
+      matrix:
+        include:
+          - dir: examples/compliant
+            expect: pass
+          - dir: examples/noncompliant
+            expect: fail
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - uses: open-policy-agent/setup-opa@v2
+        with:
+          version: latest
+      - name: Run gate against ${{ matrix.dir }}, expecting it to ${{ matrix.expect }}
+        run: |
+          set +e
+          ./scripts/check.sh "${{ matrix.dir }}"
+          status=$?
+          set -e
+          if [ "${{ matrix.expect }}" = "pass" ] && [ "$status" -ne 0 ]; then
+            echo "Expected ${{ matrix.dir }} to pass the gate, but it failed."
+            exit 1
+          fi
+          if [ "${{ matrix.expect }}" = "fail" ] && [ "$status" -eq 0 ]; then
+            echo "Expected ${{ matrix.dir }} to fail the gate, but it passed."
+            exit 1
+          fi
+          echo "Gate behaved as expected for ${{ matrix.dir }}."
