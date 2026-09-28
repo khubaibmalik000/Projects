@@ -60,3 +60,66 @@ jobs:
             exit 1
           fi
           echo "Gate behaved as expected for ${{ matrix.dir }}."
+
+  signed-bundle-server:
+    name: Signed Bundle + Policy Decision Server
+    runs-on: ubuntu-latest
+    needs: opa-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - uses: open-policy-agent/setup-opa@v2
+        with:
+          version: latest
+
+      - name: Build and sign the policy bundle
+        run: bash scripts/build-signed-bundle.sh
+
+      - name: Start the policy decision server
+        run: |
+          bash scripts/serve.sh >server.log 2>&1 &
+          echo $! >server.pid
+          for _ in $(seq 1 20); do
+            curl -sf http://localhost:8181/health >/dev/null && exit 0
+            sleep 0.5
+          done
+          echo "Server never became healthy"; cat server.log; exit 1
+
+      - name: Query the live server — noncompliant example must be rejected
+        run: |
+          set +e
+          bash scripts/query.sh examples/noncompliant
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "Expected the policy server to report violations for examples/noncompliant"
+            exit 1
+          fi
+
+      - name: Query the live server — compliant example must pass
+        run: bash scripts/query.sh examples/compliant
+
+      - name: Stop the server
+        if: always()
+        run: kill "$(cat server.pid)" 2>/dev/null || true
+
+      - name: Tamper with the signed bundle's content and confirm OPA refuses to load it
+        run: |
+          mkdir -p extracted
+          tar -xzf bundle.tar.gz -C extracted
+          echo "# tampered after signing" >>extracted/policy/terraform.rego
+          (cd extracted && tar -czf ../bundle.tampered.tar.gz .manifest .signatures.json data.json policy)
+
+          set +e
+          timeout 5 opa run --server --addr :8199 --bundle bundle.tampered.tar.gz \
+            --verification-key .keys/public.pem --verification-key-id portfolio-demo
+          status=$?
+          set -e
+
+          if [ "$status" -eq 0 ]; then
+            echo "OPA should have refused to load a bundle whose content doesn't match its signature, but it started."
+            exit 1
+          fi
+          echo "Confirmed: OPA rejected the tampered bundle instead of silently trusting it."

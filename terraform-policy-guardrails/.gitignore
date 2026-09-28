@@ -4,3 +4,12 @@
 *.tfstate.*
 plan.tfplan
 plan.json
+query.json
+
+# Signed bundle build artifacts — rebuilt from policy/ via scripts/build-signed-bundle.sh.
+# The private key is never committed, demo or otherwise.
+.keys/
+bundle*.tar.gz
+extracted/
+server.log
+server.pid
