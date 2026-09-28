@@ -173,7 +173,7 @@ OPA refuses to start. This exact check runs in CI on every push — it's not a o
 ### Security
 
 1. **Secret Scan (Gitleaks)** — scans the current working tree (not full git history — old commits predate a fix described below) for hardcoded credentials
-2. **Checkov** — a second, independent security-scanning engine against `examples/compliant`, catching a different class of finding than the hand-written Rego rules (soft-fail, same convention as `terraform-aws-eks-platform`'s own CI)
+2. **Checkov** — a second, independent security-scanning engine against `examples/compliant`, catching a different class of finding than the hand-written Rego rules (soft-fail, same convention as `terraform-aws-eks-platform`'s own CI). It currently reports 10 findings there — RDS deletion protection, Multi-AZ, IAM auth, enhanced monitoring, a CMK for the EBS volume, and similar hardening that's out of scope for what this example is demonstrating (the 8 Rego guardrails). Left visible rather than tuned away, the same call made for the sibling project's own accepted Checkov findings.
 
 So the gate's correctness, code quality, and supply-chain integrity guarantee — plus the CI pipeline's own YAML and this README — are all checked on every push, not just whether the Rego parses.
 
